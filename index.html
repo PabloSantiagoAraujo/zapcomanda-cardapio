@@ -10,11 +10,12 @@
 
     :root {
       --accent: #E63946;
-      --bg: #f8f8f8;
+      --accent2: #c0392b;
+      --bg: #f4f4f4;
       --surface: #ffffff;
-      --border: #eee;
+      --border: #e8e8e8;
       --text: #1a1a1a;
-      --text2: #666;
+      --text2: #777;
       --radius: 14px;
     }
 
@@ -25,198 +26,192 @@
       max-width: 480px;
       margin: 0 auto;
       min-height: 100vh;
-      padding-bottom: 100px;
+      padding-bottom: 110px;
     }
 
     /* HEADER */
     .header {
-      background: var(--accent);
+      background: linear-gradient(160deg, #E63946 0%, #c0392b 100%);
       color: #fff;
-      padding: 28px 20px 20px;
+      padding: 28px 20px 22px;
       text-align: center;
-      position: relative;
     }
 
     .header-logo {
-      width: 72px;
-      height: 72px;
+      width: 76px; height: 76px;
       border-radius: 50%;
       background: rgba(255,255,255,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
+      border: 3px solid rgba(255,255,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem;
       margin: 0 auto 12px;
       overflow: hidden;
     }
-
     .header-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .header h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.3px; }
+    .header-endereco { font-size: 0.8rem; opacity: 0.85; margin-top: 5px; }
 
-    .header h1 { font-size: 1.4rem; font-weight: 700; }
-    .header-endereco { font-size: 0.82rem; opacity: 0.85; margin-top: 6px; }
-
-    .status-aberto {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      margin-top: 10px;
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 20px; padding: 4px 14px;
+      font-size: 0.8rem; font-weight: 600; margin-top: 10px;
     }
-    .status-aberto::before { content: '●'; font-size: 0.6rem; color: #2ecc71; }
-    .status-fechado::before { content: '●'; font-size: 0.6rem; color: #e74c3c; }
+    .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .dot-aberto { background: #2ecc71; }
+    .dot-fechado { background: #ff6b6b; }
 
-    /* CATEGORIAS NAV */
+    /* STICKY NAV: categorias + tamanhos */
+    .sticky-nav { position: sticky; top: 0; z-index: 50; background: var(--surface); }
+
+    /* CATEGORIAS */
     .cats-nav {
-      background: var(--surface);
+      display: flex; overflow-x: auto; scrollbar-width: none;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      gap: 0;
-      overflow-x: auto;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      scrollbar-width: none;
     }
     .cats-nav::-webkit-scrollbar { display: none; }
-
     .cat-btn {
-      background: none;
-      border: none;
-      color: var(--text2);
-      padding: 12px 16px;
-      font-size: 0.82rem;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
+      background: none; border: none; color: var(--text2);
+      padding: 11px 16px; font-size: 0.82rem; font-weight: 500;
+      cursor: pointer; white-space: nowrap;
       border-bottom: 2px solid transparent;
-      transition: color 0.15s;
+      transition: all 0.15s;
     }
     .cat-btn.ativo { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 
-    /* SEÇÕES */
-    .secao { padding: 20px 16px 0; }
-    .secao-titulo {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* SELETOR DE TAMANHO */
+    .tamanho-selector {
+      padding: 10px 14px;
+      display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
     }
-    .secao-titulo::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+    .tamanho-selector::-webkit-scrollbar { display: none; }
+    .tam-btn {
+      flex-shrink: 0;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
     }
+    .tam-btn.ativo {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .tam-info { font-size: 0.72rem; color: var(--text2); align-self: center; padding-left: 2px; white-space: nowrap; }
 
-    /* CARDS DE ITEM */
+    /* SEÇÕES */
+    .secao { padding: 18px 14px 0; }
+    .secao-titulo {
+      font-size: 0.95rem; font-weight: 800;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text);
+    }
+    .secao-titulo::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* PIZZA CARD */
+    .pizza-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 14px;
+      margin-bottom: 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .pizza-card.indisponivel { opacity: 0.42; }
+
+    .pizza-info { flex: 1; min-width: 0; }
+    .pizza-nome { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
+    .pizza-desc { font-size: 0.78rem; color: var(--text2); line-height: 1.45; }
+    .pizza-preco {
+      flex-shrink: 0;
+      font-weight: 800;
+      color: var(--accent);
+      font-size: 1rem;
+      min-width: 64px;
+      text-align: right;
+    }
+    .pizza-preco.sem-preco { font-size: 0.75rem; color: var(--text2); font-weight: 500; }
+
+    /* PRODUTO CARD (bebidas, sobremesas, etc) */
     .item-card {
       background: var(--surface);
       border-radius: var(--radius);
       border: 1px solid var(--border);
       padding: 14px;
-      margin-bottom: 10px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .item-info { flex: 1; }
-    .item-nome { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
-    .item-desc { font-size: 0.8rem; color: var(--text2); line-height: 1.4; }
-    .item-preco {
-      font-weight: 700;
-      color: var(--accent);
-      font-size: 0.95rem;
-      margin-top: 6px;
-    }
-
-    .item-indisponivel { opacity: 0.45; }
-    .item-indisponivel .item-preco::after { content: ' · Indisponível'; font-size: 0.75rem; color: var(--text2); font-weight: 400; }
-
-    /* TAMANHOS (pizzaria) */
-    .tamanhos-lista { margin-top: 8px; }
-    .tamanho-row {
+      margin-bottom: 9px;
       display: flex;
       justify-content: space-between;
-      font-size: 0.82rem;
-      padding: 3px 0;
-      color: var(--text2);
-    }
-    .tamanho-row span:last-child { font-weight: 600; color: var(--accent); }
-
-    /* CTA WHATSAPP */
-    .cta-bar {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 100%;
-      max-width: 480px;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .btn-whatsapp {
-      display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: #25D366;
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      padding: 14px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      width: 100%;
-      text-decoration: none;
+      gap: 12px;
+    }
+    .item-card.indisponivel { opacity: 0.42; }
+    .item-info { flex: 1; }
+    .item-nome { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
+    .item-desc { font-size: 0.78rem; color: var(--text2); line-height: 1.45; }
+    .item-preco { font-weight: 800; color: var(--accent); font-size: 1rem; white-space: nowrap; }
+
+    /* BORDA CARD */
+    .borda-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      margin-bottom: 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .borda-nome { font-weight: 600; font-size: 0.9rem; }
+    .borda-preco { font-weight: 800; color: var(--accent); font-size: 0.95rem; }
+
+    /* FECHADO BANNER */
+    .fechado-banner {
+      background: #fff3f3; border: 1px solid #fcc;
+      border-radius: var(--radius); padding: 14px 16px;
+      margin: 14px 14px 0; text-align: center;
+      color: #c00; font-size: 0.88rem; line-height: 1.5;
     }
 
-    .btn-whatsapp:hover { opacity: 0.9; }
-
-    .cta-info { text-align: center; font-size: 0.78rem; color: var(--text2); }
+    /* CTA */
+    .cta-bar {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .btn-whatsapp {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #25D366; color: #fff;
+      border: none; border-radius: 12px;
+      padding: 13px; font-size: 0.97rem; font-weight: 700;
+      cursor: pointer; width: 100%; text-decoration: none;
+    }
+    .btn-whatsapp:hover { background: #1ebe5c; }
+    .cta-info { text-align: center; font-size: 0.76rem; color: var(--text2); }
 
     /* LOADING */
     .loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 40vh;
-      color: var(--text2);
-      gap: 12px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 40vh; color: var(--text2); gap: 12px;
     }
-
     .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      width: 30px; height: 30px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .fechado-banner {
-      background: #fff3f3;
-      border: 1px solid #fcc;
-      border-radius: var(--radius);
-      padding: 16px;
-      margin: 16px;
-      text-align: center;
-      color: #c00;
-      font-size: 0.9rem;
-    }
   </style>
 </head>
 <body>
@@ -229,28 +224,25 @@
 </div>
 
 <script>
-// ⬇ Troque aqui quando definir o nome da marca
-const MARCA = 'ZapComanda';
-
 const SUPABASE_URL = 'https://ukyalvcrtanuvldilbdb.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVreWFsdmNydGFudXZsZGlsYmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDIzOTksImV4cCI6MjA5MTUxODM5OX0.5lXRGURsAQ5ubvmoWsmgjpw6hyYAtffTmMkZU4eX21Y';
 
 async function sb(tabela, params = {}) {
   const url = new URL(`${SUPABASE_URL}/rest/v1/${tabela}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const r = await fetch(url, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-  });
+  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
   return r.json();
 }
 
-// Pega o ?slug= ou ?id= da URL
-const params = new URLSearchParams(location.search);
-const instanceName = params.get('slug') || params.get('instance') || 'bella_vista';
+const urlParams = new URLSearchParams(location.search);
+const instanceName = urlParams.get('slug') || urlParams.get('instance') || 'bella_vista';
+
+// Estado global do tamanho selecionado
+let tamanhoAtivo = null;
+let precosMap = {}; // {sabor_id: {tamanho_id: preco}}
 
 async function main() {
   try {
-    // Carrega negócio
     const negocios = await sb('negocios', { instance_name: `eq.${instanceName}`, select: '*' });
     if (!negocios.length) {
       document.getElementById('conteudo').innerHTML = '<div class="loading">Estabelecimento não encontrado.</div>';
@@ -258,17 +250,26 @@ async function main() {
     }
     const neg = negocios[0];
 
-    // Carrega dados do cardápio em paralelo
-    const [categorias, sabores, produtos, tamanhos, bordas] = await Promise.all([
+    const [categorias, sabores, produtos, tamanhos, bordas, precos] = await Promise.all([
       sb('categorias', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', order: 'ordem.asc', select: '*' }),
       sb('sabores', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
-      sb('produtos', { negocio_id: `eq.${neg.id}`, select: '*', order: 'codigo.asc' }),
+      sb('produtos', { negocio_id: `eq.${neg.id}`, select: '*', order: 'codigo.asc,nome.asc' }),
       sb('tamanhos', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', order: 'ordem.asc', select: '*' }),
-      sb('bordas', { negocio_id: `eq.${neg.id}`, select: '*' })
+      sb('bordas', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
+      sb('precos_sabor_tamanho', { negocio_id: `eq.${neg.id}`, select: '*' })
     ]);
+
+    // Monta mapa de preços: precosMap[sabor_id][tamanho_id] = preco
+    precos.forEach(p => {
+      if (!precosMap[p.sabor_id]) precosMap[p.sabor_id] = {};
+      precosMap[p.sabor_id][p.tamanho_id] = p.preco;
+    });
+
+    if (tamanhos.length) tamanhoAtivo = tamanhos[0].id;
 
     renderPage(neg, categorias, sabores, produtos, tamanhos, bordas);
   } catch (e) {
+    console.error(e);
     document.getElementById('conteudo').innerHTML = '<div class="loading">Erro ao carregar. Tente novamente.</div>';
   }
 }
@@ -277,167 +278,184 @@ function estaAberto(neg) {
   const dias = ['dom','seg','ter','qua','qui','sex','sab'];
   const agora = new Date();
   const diaKey = dias[agora.getDay()];
-  const horarios = neg.horarios || {};
-  const h = horarios[diaKey];
+  const h = (neg.horarios || {})[diaKey];
   if (!h || !h.ativo) return false;
-  const hora = agora.getHours() * 60 + agora.getMinutes();
+  const min = agora.getHours() * 60 + agora.getMinutes();
   const [ha, ma] = (h.abre || '00:00').split(':').map(Number);
   const [hf, mf] = (h.fecha || '23:59').split(':').map(Number);
-  return hora >= ha * 60 + ma && hora <= hf * 60 + mf;
+  return min >= ha * 60 + ma && min <= hf * 60 + mf;
 }
 
-function formatarPreco(v) {
-  return 'R$ ' + parseFloat(v).toFixed(2).replace('.', ',');
-}
+function fmt(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
 
 function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas) {
   const aberto = estaAberto(neg);
   const modulos = neg.modulos || {};
+  const temTamanhos = modulos.tamanhos && tamanhos.length > 0;
 
-  // Agrupa sabores por categoria
-  const saboresPorCat = {};
-  sabores.forEach(s => {
-    const cid = s.categoria_id || 'sem';
-    if (!saboresPorCat[cid]) saboresPorCat[cid] = [];
-    saboresPorCat[cid].push(s);
-  });
+  // Agrupa itens por categoria
+  const saboresPorCat = {}, produtosPorCat = {};
+  sabores.forEach(s => { (saboresPorCat[s.categoria_id || 'sem'] ??= []).push(s); });
+  produtos.forEach(p => { (produtosPorCat[p.categoria_id || 'sem'] ??= []).push(p); });
 
-  // Produtos por categoria
-  const produtosPorCat = {};
-  produtos.forEach(p => {
-    const cid = p.categoria_id || 'sem';
-    if (!produtosPorCat[cid]) produtosPorCat[cid] = [];
-    produtosPorCat[cid].push(p);
-  });
+  // Identifica categorias que têm sabores (pizza) vs produtos simples
+  const catComSabores = new Set(sabores.map(s => s.categoria_id));
 
-  // HTML do header
   let html = `
     <div class="header">
       <div class="header-logo">
-        ${neg.logo_url ? `<img src="${neg.logo_url}" alt="Logo">` : '🍴'}
+        ${neg.logo_url ? `<img src="${neg.logo_url}" alt="Logo">` : '🍕'}
       </div>
       <h1>${neg.nome}</h1>
       ${neg.endereco ? `<div class="header-endereco">📍 ${neg.endereco}</div>` : ''}
-      <div class="status-aberto ${aberto ? '' : 'status-fechado'}">
+      <div class="status-badge">
+        <span class="dot ${aberto ? 'dot-aberto' : 'dot-fechado'}"></span>
         ${aberto ? 'Aberto agora' : 'Fechado no momento'}
       </div>
     </div>
+
+    <div class="sticky-nav">
+      <div class="cats-nav" id="cats-nav">
   `;
 
-  // Nav de categorias
-  html += `<div class="cats-nav" id="cats-nav">`;
   categorias.forEach(c => {
-    html += `<button class="cat-btn" onclick="scrollParaCat('${c.id}')">${c.nome}</button>`;
+    html += `<button class="cat-btn" onclick="scrollParaCat('${c.id}')">${c.icone ? c.icone + ' ' : ''}${c.nome}</button>`;
   });
-  html += '</div>';
+  if (bordas.length && modulos.bordas) {
+    html += `<button class="cat-btn" onclick="scrollParaCat('bordas')">🫕 Bordas</button>`;
+  }
+  html += `</div>`;
 
-  // Aviso se fechado
-  if (!aberto) {
-    const dias = ['dom','seg','ter','qua','qui','sex','sab'];
-    const h = neg.horarios || {};
-    const hoje = dias[new Date().getDay()];
-    const hoj = h[hoje];
-    html += `
-      <div class="fechado-banner">
-        ⏰ Estamos fechados agora.<br>
-        ${hoj?.ativo ? `Hoje abrimos às ${hoj.abre}.` : 'Não funcionamos hoje.'}
-      </div>
-    `;
+  // Seletor de tamanho — só aparece se o estabelecimento tem módulo de tamanhos
+  if (temTamanhos) {
+    html += `<div class="tamanho-selector" id="tam-selector">`;
+    tamanhos.forEach((t, i) => {
+      html += `<button class="tam-btn ${i === 0 ? 'ativo' : ''}" data-tid="${t.id}" onclick="selecionarTamanho('${t.id}')">
+        ${t.nome}${t.fatias ? ` <span style="font-weight:400;opacity:.7">(${t.fatias} fatias)</span>` : ''}
+      </button>`;
+    });
+    html += `</div>`;
   }
 
-  // Seções por categoria
+  html += `</div>`; // fim sticky-nav
+
+  if (!aberto) {
+    const dias = ['dom','seg','ter','qua','qui','sex','sab'];
+    const hoj = (neg.horarios || {})[dias[new Date().getDay()]];
+    html += `<div class="fechado-banner">⏰ Estamos fechados agora.${hoj?.ativo ? `<br>Hoje abrimos às <strong>${hoj.abre}</strong>.` : '<br>Não funcionamos hoje.'}</div>`;
+  }
+
+  // Seções
   categorias.forEach(cat => {
-    const itensNaCat = [
-      ...(saboresPorCat[cat.id] || []),
-      ...(produtosPorCat[cat.id] || [])
-    ];
-    if (!itensNaCat.length) return;
+    const sabs = saboresPorCat[cat.id] || [];
+    const prods = produtosPorCat[cat.id] || [];
+    if (!sabs.length && !prods.length) return;
 
     html += `<div class="secao" id="cat-${cat.id}">`;
-    html += `<div class="secao-titulo">${cat.icone || ''} ${cat.nome}</div>`;
+    html += `<div class="secao-titulo">${cat.icone ? cat.icone + ' ' : ''}${cat.nome}</div>`;
 
-    itensNaCat.forEach(item => {
-      const disponivel = item.disponivel;
-      html += `<div class="item-card ${disponivel ? '' : 'item-indisponivel'}">`;
-      html += `<div class="item-info">`;
-      html += `<div class="item-nome">${item.nome}</div>`;
-      if (item.descricao) html += `<div class="item-desc">${item.descricao}</div>`;
+    // Sabores (pizza) — preço dinâmico por tamanho
+    sabs.forEach(s => {
+      const precosTam = precosMap[s.id] || {};
+      // Serializa preços como data-attribute para JS atualizar depois
+      const precosJson = encodeURIComponent(JSON.stringify(precosTam));
+      const precoInicial = tamanhoAtivo && precosTam[tamanhoAtivo] ? fmt(precosTam[tamanhoAtivo]) : '';
 
-      // Se tem tamanhos (sabor de pizza), mostra preços por tamanho
-      if (modulos.tamanhos && tamanhos.length && item.categoria_id !== null) {
-        html += `<div class="tamanhos-lista">`;
-        // Nota: idealmente viria precos_sabor_tamanho — aqui mostra só os tamanhos como referência
-        tamanhos.forEach(t => {
-          html += `<div class="tamanho-row"><span>${t.nome} (${t.fatias} fatias)</span><span>sob consulta</span></div>`;
-        });
-        html += `</div>`;
-      } else if (item.preco) {
-        html += `<div class="item-preco">${formatarPreco(item.preco)}</div>`;
-      }
-
-      html += '</div></div>';
+      html += `
+        <div class="pizza-card ${s.disponivel ? '' : 'indisponivel'}">
+          <div class="pizza-info">
+            <div class="pizza-nome">${s.nome}</div>
+            ${s.descricao ? `<div class="pizza-desc">${s.descricao}</div>` : ''}
+          </div>
+          <div class="pizza-preco ${precoInicial ? '' : 'sem-preco'}" data-sabor="${s.id}" data-precos="${precosJson}">
+            ${precoInicial || '—'}
+          </div>
+        </div>`;
     });
 
-    html += '</div>';
+    // Produtos simples
+    prods.forEach(p => {
+      html += `
+        <div class="item-card ${p.disponivel ? '' : 'indisponivel'}">
+          <div class="item-info">
+            <div class="item-nome">${p.codigo ? p.codigo + '. ' : ''}${p.nome}</div>
+            ${p.descricao ? `<div class="item-desc">${p.descricao}</div>` : ''}
+          </div>
+          ${p.preco ? `<div class="item-preco">${fmt(p.preco)}</div>` : ''}
+        </div>`;
+    });
+
+    html += `</div>`;
   });
 
   // Bordas
   if (bordas.length && modulos.bordas) {
-    html += `
-      <div class="secao" id="cat-bordas">
-        <div class="secao-titulo">🫕 Bordas Recheadas</div>
-        ${bordas.filter(b => b.disponivel).map(b => `
-          <div class="item-card">
-            <div class="item-info">
-              <div class="item-nome">${b.nome}</div>
-              <div class="item-preco">${b.preco_adicional > 0 ? '+' + formatarPreco(b.preco_adicional) : 'Grátis'}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
+    html += `<div class="secao" id="cat-bordas"><div class="secao-titulo">🫕 Bordas Recheadas</div>`;
+    bordas.filter(b => b.disponivel).forEach(b => {
+      html += `
+        <div class="borda-card">
+          <span class="borda-nome">${b.nome}</span>
+          <span class="borda-preco">${b.preco_adicional > 0 ? '+' + fmt(b.preco_adicional) : 'Grátis'}</span>
+        </div>`;
+    });
+    html += `</div>`;
   }
 
   // CTA WhatsApp
-  const numero = neg.whatsapp_numero ? neg.whatsapp_numero.replace(/\D/g, '') : '';
-  const msg = encodeURIComponent(`Olá! Vi o cardápio e quero fazer um pedido 🍕`);
+  const numero = (neg.whatsapp_numero || '').replace(/\D/g, '');
+  const msg = encodeURIComponent('Olá! Vi o cardápio e quero fazer um pedido 🍕');
   const linkWpp = numero ? `https://wa.me/${numero}?text=${msg}` : '#';
 
   html += `
     <div class="cta-bar">
       <a class="btn-whatsapp" href="${linkWpp}" target="_blank" rel="noopener">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-        </svg>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         Pedir pelo WhatsApp
       </a>
       <div class="cta-info">
         ${neg.formas_pagamento ? '💳 ' + neg.formas_pagamento : ''}
         ${neg.tempo_estimado_entrega ? ' · ⏱ Entrega em ' + neg.tempo_estimado_entrega : ''}
       </div>
-    </div>
-  `;
+    </div>`;
 
   document.getElementById('conteudo').innerHTML = html;
 
-  // Ativa primeiro item do nav
-  const primeiroCat = document.querySelector('.cat-btn');
-  if (primeiroCat) primeiroCat.classList.add('ativo');
-
-  // Scroll spy
+  // Scroll spy categorias
   const observer = new IntersectionObserver(entries => {
     entries.forEach(e => {
       if (e.isIntersecting) {
         const id = e.target.id.replace('cat-', '');
         document.querySelectorAll('.cat-btn').forEach(b => {
-          const onclick = b.getAttribute('onclick') || '';
-          b.classList.toggle('ativo', onclick.includes(id));
+          const oc = b.getAttribute('onclick') || '';
+          b.classList.toggle('ativo', oc.includes(`'${id}'`));
         });
       }
     });
-  }, { threshold: 0.3 });
+  }, { threshold: 0.25, rootMargin: '-60px 0px 0px 0px' });
 
   document.querySelectorAll('.secao').forEach(s => observer.observe(s));
+}
+
+function selecionarTamanho(tid) {
+  tamanhoAtivo = tid;
+
+  // Atualiza botões
+  document.querySelectorAll('.tam-btn').forEach(b => {
+    b.classList.toggle('ativo', b.dataset.tid === tid);
+  });
+
+  // Atualiza preços de todos os sabores
+  document.querySelectorAll('.pizza-preco[data-sabor]').forEach(el => {
+    const precos = JSON.parse(decodeURIComponent(el.dataset.precos || '{}'));
+    const preco = precos[tid];
+    if (preco) {
+      el.textContent = fmt(preco);
+      el.classList.remove('sem-preco');
+    } else {
+      el.textContent = '—';
+      el.classList.add('sem-preco');
+    }
+  });
 }
 
 function scrollParaCat(id) {
