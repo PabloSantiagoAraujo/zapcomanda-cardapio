@@ -396,9 +396,21 @@
             <option value="">Selecione o bairro...</option>
           </select>
         </div>
-        <div class="checkout-field">
+        <div id="campo-rua-numero" class="checkout-field">
           <label>Rua e número *</label>
           <input id="checkout-endereco" class="checkout-input" type="text" placeholder="Ex: Rua das Flores, 123">
+        </div>
+        <div id="campo-outro-bairro" style="display:none;flex-direction:column;gap:10px">
+          <div class="checkout-field">
+            <label>Endereço completo *</label>
+            <input id="checkout-endereco-dist" class="checkout-input" type="text" placeholder="Ex: Rua das Flores, 123, Jardim Liberdade">
+          </div>
+          <button id="btn-calc-frete" onclick="calcularFrete()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer">
+            📏 Calcular frete
+          </button>
+          <div id="frete-resultado" style="display:none;background:#f0faf4;border:1px solid #c3e6cb;border-radius:10px;padding:12px;font-size:0.85rem;color:#2d6a4f">
+            📍 Distância: <strong id="frete-dist">—</strong> &nbsp;·&nbsp; 🛵 Taxa: <strong id="frete-taxa">—</strong>
+          </div>
         </div>
         <div id="taxa-info" style="display:none;background:#f8f8f8;border-radius:10px;padding:10px 14px;font-size:0.85rem;color:#555">
           🛵 Taxa de entrega: <strong id="taxa-val">R$ 0,00</strong>
@@ -442,6 +454,7 @@ let saborNomes = {};
 let negGlobal = null;
 let zonasEntregaGlobal = [];
 let taxaEntregaSelecionada = 0;
+let bairroOutroNome = '';
 
 // Seleção atual de pizza
 let saboresSelecionados = new Set();
@@ -783,6 +796,14 @@ function toggleCamposEntrega() {
         opt.textContent = `${z.nome} — R$ ${parseFloat(z.taxa).toFixed(2).replace('.', ',')}`;
         sel.appendChild(opt);
       });
+      // Adiciona "outro bairro" se restaurante tem coordenadas configuradas
+      const modulos = negGlobal?.modulos || {};
+      if (modulos.coords_lat && modulos.taxa_por_km) {
+        const opt = document.createElement('option');
+        opt.value = 'outro';
+        opt.textContent = '📍 Outro bairro (calcular por distância)...';
+        sel.appendChild(opt);
+      }
     }
   }
   if (!isDelivery) {
@@ -794,16 +815,73 @@ function toggleCamposEntrega() {
 function selecionarBairroCheckout() {
   const sel = document.getElementById('checkout-bairro');
   const opt = sel.options[sel.selectedIndex];
-  const taxa = parseFloat(opt.dataset.taxa || 0);
-  taxaEntregaSelecionada = taxa;
-  const infoEl = document.getElementById('taxa-info');
-  const valEl = document.getElementById('taxa-val');
-  if (taxa > 0 && opt.value) {
-    infoEl.style.display = 'block';
-    valEl.textContent = fmt(taxa);
-  } else {
-    infoEl.style.display = 'none';
-    taxaEntregaSelecionada = 0;
+  const isOutro = opt.value === 'outro';
+
+  document.getElementById('campo-rua-numero').style.display = isOutro ? 'none' : 'block';
+  document.getElementById('campo-outro-bairro').style.display = isOutro ? 'flex' : 'none';
+  document.getElementById('taxa-info').style.display = 'none';
+  taxaEntregaSelecionada = 0;
+  bairroOutroNome = '';
+
+  if (!isOutro) {
+    const taxa = parseFloat(opt.dataset.taxa || 0);
+    taxaEntregaSelecionada = taxa;
+    if (taxa > 0 && opt.value) {
+      document.getElementById('taxa-info').style.display = 'block';
+      document.getElementById('taxa-val').textContent = fmt(taxa);
+    }
+  }
+}
+
+// ── HAVERSINE + FRETE POR DISTÂNCIA ──────────────────────────────────
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function calcularFrete() {
+  const endereco = document.getElementById('checkout-endereco-dist').value.trim();
+  if (!endereco) { mostrarToast('Digite o endereço completo'); return; }
+
+  const modulos = negGlobal?.modulos || {};
+  if (!modulos.coords_lat) { mostrarToast('Restaurante não configurou entrega por distância'); return; }
+
+  const btn = document.getElementById('btn-calc-frete');
+  btn.textContent = 'Calculando...';
+  btn.disabled = true;
+
+  try {
+    const cidade = negGlobal.cidade ? `${negGlobal.cidade} Brasil` : 'Rondonópolis MT Brasil';
+    const query = `${endereco}, ${cidade}`;
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`,
+      { headers: { 'User-Agent': 'ZapComanda/1.0' } }
+    );
+    const data = await resp.json();
+    if (!data.length) {
+      mostrarToast('Endereço não encontrado. Tente detalhar mais (ex: rua + bairro)');
+      return;
+    }
+
+    const dist = haversine(modulos.coords_lat, modulos.coords_lng, parseFloat(data[0].lat), parseFloat(data[0].lon));
+    const taxaCalc = Math.max(modulos.taxa_minima || 5, dist * (modulos.taxa_por_km || 2));
+    taxaEntregaSelecionada = Math.round(taxaCalc * 100) / 100;
+
+    bairroOutroNome = data[0].display_name.split(',').slice(0,2).join(',').trim();
+
+    document.getElementById('frete-resultado').style.display = 'block';
+    document.getElementById('frete-dist').textContent = dist.toFixed(1) + ' km';
+    document.getElementById('frete-taxa').textContent = fmt(taxaEntregaSelecionada);
+    document.getElementById('taxa-info').style.display = 'block';
+    document.getElementById('taxa-val').textContent = fmt(taxaEntregaSelecionada);
+  } catch(e) {
+    mostrarToast('Erro ao calcular frete. Verifique sua conexão.');
+  } finally {
+    btn.textContent = '📏 Calcular frete';
+    btn.disabled = false;
   }
 }
 
@@ -832,12 +910,18 @@ async function confirmarPedido() {
   const obs = document.getElementById('checkout-obs').value.trim();
 
   const bairroSel = document.getElementById('checkout-bairro');
-  const bairroNome = bairroSel?.options[bairroSel.selectedIndex]?.dataset?.nome || '';
-  const enderecoRua = document.getElementById('checkout-endereco')?.value.trim() || '';
+  const isOutroBairro = bairroSel?.value === 'outro';
+  const bairroNome = isOutroBairro
+    ? bairroOutroNome || 'Outro bairro'
+    : (bairroSel?.options[bairroSel.selectedIndex]?.dataset?.nome || '');
+  const enderecoRua = isOutroBairro
+    ? (document.getElementById('checkout-endereco-dist')?.value.trim() || '')
+    : (document.getElementById('checkout-endereco')?.value.trim() || '');
 
   if (!nome) { mostrarToast('Digite seu nome'); return; }
   if (telRaw.length < 10) { mostrarToast('Digite um WhatsApp válido com DDD'); return; }
-  if (entrega === 'delivery' && !bairroNome) { mostrarToast('Selecione o bairro de entrega'); return; }
+  if (entrega === 'delivery' && !bairroSel?.value) { mostrarToast('Selecione o bairro de entrega'); return; }
+  if (entrega === 'delivery' && isOutroBairro && !taxaEntregaSelecionada) { mostrarToast('Calcule o frete antes de confirmar'); return; }
   if (entrega === 'delivery' && !enderecoRua) { mostrarToast('Digite o endereço de entrega'); return; }
 
   const btn = document.getElementById('btn-confirmar');
@@ -910,6 +994,7 @@ async function confirmarPedido() {
     carrinho = []; prodQtd = {}; saboresSelecionados.clear();
     bordaSelecionadaId = null; bordaSelecionadaNome = ''; bordaSelecionadaPreco = 0; qtdPizza = 1;
     taxaEntregaSelecionada = 0;
+    bairroOutroNome = '';
     document.querySelectorAll('.pizza-card').forEach(c => c.classList.remove('selecionado', 'desabilitado'));
     document.querySelectorAll('.borda-card').forEach(c => c.classList.remove('selecionada'));
     const qv = document.getElementById('qtd-pizza-val'); if (qv) qv.textContent = '1';
