@@ -435,6 +435,18 @@
 const SUPABASE_URL = 'https://ukyalvcrtanuvldilbdb.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVreWFsdmNydGFudXZsZGlsYmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDIzOTksImV4cCI6MjA5MTUxODM5OX0.5lXRGURsAQ5ubvmoWsmgjpw6hyYAtffTmMkZU4eX21Y';
 
+const PRESETS = {
+  pizzaria:    { accent:'#CE2B37', accent2:'#a01f28', gradient:'linear-gradient(160deg,#009246 0%,#CE2B37 100%)', emoji:'🍕' },
+  massas:      { accent:'#CE2B37', accent2:'#a01f28', gradient:'linear-gradient(160deg,#009246 0%,#CE2B37 100%)', emoji:'🍝' },
+  japonesa:    { accent:'#BC002D', accent2:'#8c0020', gradient:'linear-gradient(160deg,#1a1a1a 0%,#BC002D 100%)', emoji:'🍣' },
+  lanchonete:  { accent:'#B22234', accent2:'#8a1a27', gradient:'linear-gradient(160deg,#3C3B6E 0%,#B22234 100%)', emoji:'🍔' },
+  marmitaria:  { accent:'#009C3B', accent2:'#007a2e', gradient:'linear-gradient(160deg,#009C3B 0%,#FFDF00 100%)', emoji:'🍱' },
+  acai:        { accent:'#6B2D8B', accent2:'#521f6b', gradient:'linear-gradient(160deg,#6B2D8B 0%,#3d1a52 100%)', emoji:'🫐' },
+  pastelaria:  { accent:'#DE2910', accent2:'#b01f0c', gradient:'linear-gradient(160deg,#DE2910 0%,#8B0000 100%)', emoji:'🥟' },
+  churrascaria:{ accent:'#8B2500', accent2:'#6b1c00', gradient:'linear-gradient(160deg,#1a0a00 0%,#8B2500 100%)', emoji:'🥩' },
+  generico:    { accent:'#E63946', accent2:'#c0392b', gradient:'linear-gradient(160deg,#E63946 0%,#c0392b 100%)', emoji:'🍽️' }
+};
+
 async function sb(tabela, params = {}) {
   const url = new URL(`${SUPABASE_URL}/rest/v1/${tabela}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -1023,6 +1035,12 @@ function mostrarToast(msg) {
 function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos = []) {
   const aberto = estaAberto(neg);
   const modulos = neg.modulos || {};
+
+  // Aplicar preset de cores por tipo
+  const preset = PRESETS[neg.tipo] || PRESETS.generico;
+  document.documentElement.style.setProperty('--accent', preset.accent);
+  document.documentElement.style.setProperty('--accent2', preset.accent2);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', preset.accent);
   const temTamanhos = modulos.tamanhos && tamanhos.length > 0;
 
   const saboresPorCat = {}, produtosPorCat = {};
@@ -1030,8 +1048,8 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
   produtos.forEach(p => { const k = p.categoria_id || 'sem'; if (!produtosPorCat[k]) produtosPorCat[k] = []; produtosPorCat[k].push(p); });
 
   let html = `
-    <div class="header">
-      <div class="header-logo">${neg.logo_url ? `<img src="${neg.logo_url}" alt="Logo">` : '🍕'}</div>
+    <div class="header" style="background:${preset.gradient}">
+      <div class="header-logo">${neg.logo_url ? `<img src="${neg.logo_url}" alt="Logo">` : preset.emoji}</div>
       <h1>${neg.nome}</h1>
       ${neg.endereco ? `<div class="header-endereco">📍 ${neg.endereco}</div>` : ''}
       <div class="status-badge">
@@ -1195,6 +1213,28 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
         </div>`;
     });
     html += `</div>`;
+  }
+
+  // Banner publicitário (plano básico ou sem plano)
+  const planoAtivo = neg.plano || 'basico';
+  if (planoAtivo === 'basico') {
+    html += `
+      <a href="https://radar364.com.br" target="_blank" rel="noopener" style="display:block;margin:18px 14px 0;text-decoration:none">
+        <div style="
+          background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+          border-radius:12px;border:1px solid rgba(255,255,255,0.08);
+          padding:14px 16px;display:flex;align-items:center;gap:12px;
+          box-shadow:0 2px 12px rgba(0,0,0,0.15);
+        ">
+          <div style="font-size:1.8rem;flex-shrink:0">📰</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;font-size:0.9rem;color:#fff;letter-spacing:-0.2px">Radar364</div>
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);margin-top:1px">Notícias de Mato Grosso em tempo real</div>
+          </div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);white-space:nowrap">Acesse →</div>
+        </div>
+        <div style="text-align:center;font-size:0.62rem;color:#bbb;margin-top:5px">Espaço publicitário</div>
+      </a>`;
   }
 
   // Footer
