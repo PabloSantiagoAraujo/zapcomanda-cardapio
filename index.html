@@ -340,6 +340,22 @@
   <div class="loading"><div class="spinner"></div><span>Carregando cardápio...</span></div>
 </div>
 
+<!-- ADICIONAIS MODAL -->
+<div class="checkout-modal" id="adicionais-modal" onclick="fecharAdicionaisModal(event)" style="display:none;align-items:center;justify-content:center">
+  <div class="checkout-sheet" style="max-height:80vh;border-radius:16px;padding:20px">
+    <div class="cart-sheet-header" style="margin-bottom:12px">
+      <span class="cart-sheet-title" id="adicionais-modal-titulo">Adicionais</span>
+      <button class="cart-close" onclick="fecharAdicionaisModal()">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">Selecione os extras desejados (opcional):</p>
+    <div id="adicionais-lista" style="display:flex;flex-direction:column;gap:10px;max-height:40vh;overflow-y:auto;margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn-continuar" style="flex:1" onclick="confirmarAdicionais(false)">Sem adicionais</button>
+      <button class="btn-wpp" style="flex:1" onclick="confirmarAdicionais(true)">Adicionar ✓</button>
+    </div>
+  </div>
+</div>
+
 <!-- CARRINHO MODAL -->
 <div class="cart-modal" id="cart-modal" onclick="fecharCarrinhoModal(event)">
   <div class="cart-sheet">
@@ -369,14 +385,15 @@
       <span class="cart-sheet-title">📋 Finalizar pedido</span>
       <button class="cart-close" onclick="fecharCheckout()">✕</button>
     </div>
-    <div style="display:flex;flex-direction:column;gap:14px">
+    <div id="checkout-form" style="display:flex;flex-direction:column;gap:14px">
       <div class="checkout-field">
         <label>Seu nome *</label>
         <input id="checkout-nome" class="checkout-input" type="text" placeholder="Nome completo" autocomplete="name">
       </div>
       <div class="checkout-field">
         <label>Seu WhatsApp *</label>
-        <input id="checkout-tel" class="checkout-input" type="tel" placeholder="(66) 99999-9999" autocomplete="tel">
+        <input id="checkout-tel" class="checkout-input" type="tel" placeholder="(66) 99999-9999" autocomplete="tel" onblur="buscarHistoricoCliente()">
+        <div id="checkout-historico" style="display:none;margin-top:8px;background:#fff8f8;border-radius:10px;padding:10px 14px;font-size:0.84rem;color:var(--accent)"></div>
       </div>
       <div class="checkout-field">
         <label>Tipo de entrega</label>
@@ -416,6 +433,10 @@
           🛵 Taxa de entrega: <strong id="taxa-val">R$ 0,00</strong>
         </div>
       </div>
+      <div class="checkout-field" id="campo-pagamento" style="display:none">
+        <label>Forma de pagamento *</label>
+        <div id="pagamento-opts" style="display:flex;flex-direction:column;gap:8px;margin-top:6px"></div>
+      </div>
       <div class="checkout-field">
         <label>Observação (opcional)</label>
         <textarea id="checkout-obs" class="checkout-input" placeholder="Ex: sem cebola, troco para R$50..." rows="2" style="resize:none"></textarea>
@@ -426,6 +447,20 @@
       </button>
     </div>
   </div>
+</div>
+
+<!-- TELA DE SUCESSO DO PEDIDO -->
+<div id="checkout-sucesso" style="display:none;text-align:center;padding:10px 4px">
+  <div style="font-size:3.5rem;margin-bottom:10px">✅</div>
+  <div style="font-weight:800;font-size:1.15rem;margin-bottom:6px">Pedido confirmado!</div>
+  <div id="sucesso-num" style="color:var(--text2);font-size:0.88rem;margin-bottom:16px"></div>
+  <div id="sucesso-pizzas" style="display:none;background:#fff8f8;border:1px solid #ffd6d6;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:0.88rem;color:var(--accent);font-weight:600"></div>
+  <div style="background:#f0faf4;border-radius:12px;padding:14px;margin-bottom:18px;font-size:0.86rem;color:#2d6a4f;line-height:1.5">
+    📱 Acompanhe seu pedido pelo WhatsApp!<br>
+    <span style="font-size:0.8rem;color:#555">Enviaremos atualizações direto para o seu número.</span>
+  </div>
+  <button id="sucesso-btn-wpp" class="btn-wpp" style="margin-bottom:10px;width:100%">💬 Abrir WhatsApp do restaurante</button>
+  <button class="btn-continuar" style="width:100%" onclick="fecharSucesso()">Fazer outro pedido</button>
 </div>
 
 <!-- TOAST -->
@@ -451,6 +486,7 @@ async function sb(tabela, params = {}) {
   const url = new URL(`${SUPABASE_URL}/rest/v1/${tabela}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+  if (!r.ok) throw new Error(`Supabase ${tabela} ${r.status}: ${await r.text()}`);
   return r.json();
 }
 
@@ -465,6 +501,9 @@ let precosMap = {};
 let saborNomes = {};
 let negGlobal = null;
 let zonasEntregaGlobal = [];
+let adicionaisGlobal = [];
+let produtoCatIdMap = {};  // produto.id → categoria_id
+let catNomeMap = {};       // categoria_id → categoria.nome
 let taxaEntregaSelecionada = 0;
 let bairroOutroNome = '';
 
@@ -474,6 +513,7 @@ let bordaSelecionadaId = null;
 let bordaSelecionadaNome = '';
 let bordaSelecionadaPreco = 0;
 let qtdPizza = 1;
+let pizzaAdicionaisSelecionados = [];
 
 // Carrinho
 let carrinho = [];
@@ -489,19 +529,21 @@ async function main() {
     const neg = negocios[0];
     negGlobal = neg;
 
-    const [categorias, sabores, produtos, tamanhos, bordas, combos, zonas] = await Promise.all([
+    const [categorias, sabores, produtos, tamanhos, bordas, combos, zonas, adicionais] = await Promise.all([
       sb('categorias', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', order: 'ordem.asc', select: '*' }),
       sb('sabores', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
       sb('produtos', { negocio_id: `eq.${neg.id}`, select: '*', order: 'codigo.asc,nome.asc' }),
       sb('tamanhos', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', order: 'ordem.asc', select: '*' }),
       sb('bordas', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
-      sb('combos', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', select: '*', order: 'criado_em.asc' }),
-      sb('zonas_entrega', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' })
+      sb('combos', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', select: '*', order: 'nome.asc' }),
+      sb('zonas_entrega', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' }),
+      sb('adicionais', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' })
     ]);
 
     tamanhosGlobal = tamanhos;
     bordasGlobal = bordas;
     zonasEntregaGlobal = zonas;
+    adicionaisGlobal = adicionais;
 
     if (sabores.length) {
       const ids = sabores.map(s => s.id).join(',');
@@ -514,6 +556,27 @@ async function main() {
     }
 
     if (tamanhos.length) tamanhoAtivo = tamanhos[0].id;
+
+    // Popular opções de pagamento
+    if (neg.formas_pagamento) {
+      const formas = neg.formas_pagamento.split(/,\s*|\s+e\s+/i).map(s => s.trim()).filter(Boolean);
+      const container = document.getElementById('pagamento-opts');
+      if (container && formas.length) {
+        container.innerHTML = formas.map((f, i) => `
+          <label class="entrega-opt">
+            <input type="radio" name="pagamento" value="${f}" ${i === 0 ? 'checked' : ''}> ${f}
+          </label>`).join('');
+        document.getElementById('campo-pagamento').style.display = '';
+      }
+    }
+
+    // Ordenar combos por dia da semana
+    const _diaOrdem = { segunda:1, terça:2, terca:2, quarta:3, quinta:4, sexta:5, sábado:6, sabado:6, domingo:7 };
+    combos.sort((a, b) => {
+      const getDia = n => { const l = n.toLowerCase(); for (const [d,o] of Object.entries(_diaOrdem)) if (l.includes(d)) return o; return 99; };
+      return getDia(a.nome) - getDia(b.nome);
+    });
+
     renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos);
   } catch(e) {
     console.error(e);
@@ -528,9 +591,22 @@ function estaAberto(neg) {
   const h = (neg.horarios || {})[diaKey];
   if (!h || !h.ativo) return false;
   const min = agora.getHours() * 60 + agora.getMinutes();
+
+  function dentroDoIntervalo(abre, fecha) {
+    const a = abre, f = fecha;
+    if (f < a) return min >= a || min <= f; // cruza meia-noite
+    return min >= a && min <= f;
+  }
+
   const [ha, ma] = (h.abre || '00:00').split(':').map(Number);
   const [hf, mf] = (h.fecha || '23:59').split(':').map(Number);
-  return min >= ha * 60 + ma && min <= hf * 60 + mf;
+  if (dentroDoIntervalo(ha * 60 + ma, hf * 60 + mf)) return true;
+  if (h.periodo2 && h.abre2 && h.fecha2) {
+    const [ha2, ma2] = h.abre2.split(':').map(Number);
+    const [hf2, mf2] = h.fecha2.split(':').map(Number);
+    if (dentroDoIntervalo(ha2 * 60 + ma2, hf2 * 60 + mf2)) return true;
+  }
+  return false;
 }
 
 function fmt(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
@@ -600,6 +676,25 @@ function selecionarBorda(bid, bNome, bPreco) {
   });
 }
 
+// ── ADICIONAIS PIZZA ──────────────────────────────────
+function togglePizzaAdicional(id, nome, preco) {
+  const idx = pizzaAdicionaisSelecionados.findIndex(a => a.id === id);
+  const chk = document.getElementById(`pizza-adic-chk-${id}`);
+  const lbl = document.getElementById(`pizza-adic-lbl-${id}`);
+  const input = document.querySelector(`.pizza-adic-input[data-id="${id}"]`);
+  if (idx >= 0) {
+    pizzaAdicionaisSelecionados.splice(idx, 1);
+    if (chk) { chk.style.borderColor = 'var(--border)'; chk.style.background = '#f8f8f8'; chk.innerHTML = ''; }
+    if (lbl) { lbl.style.borderColor = 'var(--border)'; lbl.style.background = ''; }
+    if (input) input.checked = false;
+  } else {
+    pizzaAdicionaisSelecionados.push({ id, nome, preco: parseFloat(preco) || 0 });
+    if (chk) { chk.style.borderColor = 'var(--accent)'; chk.style.background = 'var(--accent)'; chk.innerHTML = '<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+    if (lbl) { lbl.style.borderColor = 'var(--accent)'; lbl.style.background = '#fff8f8'; }
+    if (input) input.checked = true;
+  }
+}
+
 // ── QUANTIDADE PIZZA ──────────────────────────────────
 function alterarQtdPizza(delta) {
   qtdPizza = Math.max(1, qtdPizza + delta);
@@ -612,7 +707,8 @@ function adicionarPizza() {
   if (saboresSelecionados.size === 0) { mostrarToast('Selecione pelo menos 1 sabor'); return; }
   const tam = tamanhosGlobal.find(t => t.id === tamanhoAtivo);
   const precoUnit = precoPizzaAtual();
-  const total = (precoUnit + bordaSelecionadaPreco) * qtdPizza;
+  const adicionaisTotal = pizzaAdicionaisSelecionados.reduce((s, a) => s + a.preco, 0);
+  const total = (precoUnit + bordaSelecionadaPreco + adicionaisTotal) * qtdPizza;
 
   carrinho.push({
     tipo: 'pizza',
@@ -623,6 +719,7 @@ function adicionarPizza() {
     bordaId: bordaSelecionadaId,
     bordaNome: bordaSelecionadaNome,
     bordaPreco: bordaSelecionadaPreco,
+    adicionais: [...pizzaAdicionaisSelecionados],
     qty: qtdPizza,
     precoUnit,
     total
@@ -631,10 +728,14 @@ function adicionarPizza() {
   // Reset seleção de pizza
   saboresSelecionados.clear();
   bordaSelecionadaId = null; bordaSelecionadaNome = ''; bordaSelecionadaPreco = 0;
+  pizzaAdicionaisSelecionados = [];
   qtdPizza = 1;
 
   document.querySelectorAll('.pizza-card').forEach(c => c.classList.remove('selecionado', 'desabilitado'));
   document.querySelectorAll('.borda-card').forEach(c => c.classList.remove('selecionada'));
+  document.querySelectorAll('.pizza-adic-input').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('[id^="pizza-adic-chk-"]').forEach(el => { el.style.borderColor = 'var(--border)'; el.style.background = '#f8f8f8'; el.innerHTML = ''; });
+  document.querySelectorAll('[id^="pizza-adic-lbl-"]').forEach(el => { el.style.borderColor = 'var(--border)'; el.style.background = ''; });
 
   const qv = document.getElementById('qtd-pizza-val');
   if (qv) qv.textContent = '1';
@@ -645,22 +746,87 @@ function adicionarPizza() {
   const instr = document.getElementById('sabores-instrucao');
   if (instr) instr.innerHTML = `Escolha até <strong>${max}</strong> sabor${max > 1 ? 'es' : ''}`;
 
-  mostrarToast('Pizza adicionada ao carrinho! 🍕');
+  mostrarToast('Item adicionado ao carrinho! 🍣');
   atualizarFooter();
 }
 
 // ── PRODUTO +/- ──────────────────────────────────
+let _addPendente = null; // { pId, pNome, pPreco } enquanto modal de adicionais está aberto
+
 function addProduto(pId, pNome, pPreco) {
+  // Se já tem no carrinho, só incrementa sem pedir adicionais de novo
   const idx = carrinho.findIndex(c => c.tipo === 'produto' && c.id === pId);
   if (idx >= 0) {
     carrinho[idx].qty++;
     carrinho[idx].total = carrinho[idx].qty * carrinho[idx].precoUnit;
-  } else {
-    carrinho.push({ tipo: 'produto', id: pId, nome: pNome, qty: 1, precoUnit: pPreco, total: pPreco });
+    prodQtd[pId] = (prodQtd[pId] || 0) + 1;
+    renderProdQtd(pId);
+    atualizarFooter();
+    return;
   }
+  // Primeiro add — checar adicionais disponíveis (pular para bebidas)
+  const catId = produtoCatIdMap[pId];
+  const catNome = catNomeMap[catId] || '';
+  const eBebida = /bebida|refrigerante|suco|cerveja|drink|água|agua|energetico|energético|vinho|cacha|whisky|destilado/i.test(catNome);
+  const ativos = eBebida ? [] : adicionaisGlobal.filter(a => a.disponivel);
+  if (ativos.length > 0) {
+    _addPendente = { pId, pNome: pNome || '', pPreco: parseFloat(pPreco) || 0 };
+    abrirAdicionaisModal(pNome || '', ativos);
+  } else {
+    _concluirAddProduto(pId, pNome, parseFloat(pPreco) || 0, []);
+  }
+}
+
+function abrirAdicionaisModal(pNome, ativos) {
+  document.getElementById('adicionais-modal-titulo').textContent = `➕ Adicionais para ${pNome}`;
+  document.getElementById('adicionais-lista').innerHTML = ativos.map(a => `
+    <label style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:10px;padding:10px 14px;cursor:pointer;gap:8px">
+      <span style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" class="adicional-check" data-id="${a.id}" data-nome="${a.nome}" data-preco="${a.preco}" style="width:18px;height:18px;cursor:pointer">
+        <span style="font-size:0.95rem">${a.nome}</span>
+      </span>
+      <span style="font-size:0.85rem;color:var(--green);font-weight:600;white-space:nowrap">
+        ${parseFloat(a.preco) > 0 ? '+ R$ ' + parseFloat(a.preco).toFixed(2).replace('.', ',') : 'Grátis'}
+      </span>
+    </label>`).join('');
+  const modal = document.getElementById('adicionais-modal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function fecharAdicionaisModal(e) {
+  if (e && e.target !== document.getElementById('adicionais-modal')) return;
+  document.getElementById('adicionais-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  _addPendente = null;
+}
+
+function confirmarAdicionais(comAdicionais) {
+  if (!_addPendente) return;
+  const { pId, pNome, pPreco } = _addPendente;
+  const selecionados = comAdicionais
+    ? [...document.querySelectorAll('.adicional-check:checked')].map(el => ({
+        id: el.dataset.id, nome: el.dataset.nome, preco: parseFloat(el.dataset.preco) || 0
+      }))
+    : [];
+  document.getElementById('adicionais-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  _addPendente = null;
+  _concluirAddProduto(pId, pNome, pPreco, selecionados);
+}
+
+function _concluirAddProduto(pId, pNome, pPreco, adicionaisSel) {
+  const extraTotal = adicionaisSel.reduce((s, a) => s + a.preco, 0);
+  const precoFinal = pPreco + extraTotal;
+  carrinho.push({
+    tipo: 'produto', id: pId, nome: pNome, qty: 1,
+    precoUnit: precoFinal, total: precoFinal,
+    adicionais: adicionaisSel
+  });
   prodQtd[pId] = (prodQtd[pId] || 0) + 1;
   renderProdQtd(pId);
   atualizarFooter();
+  mostrarToast('Item adicionado! 🛒');
 }
 
 function removeProduto(pId) {
@@ -761,25 +927,30 @@ function renderCarrinhoModal() {
     if (item.tipo === 'pizza') {
       const sabsStr = item.saboresNomes.join(', ');
       const bordaStr = item.bordaNome ? `Borda: ${item.bordaNome} (+${fmt(item.bordaPreco)})` : 'Sem borda';
+      const adicStr = (item.adicionais || []).length ? `<br>Adicionais: ${item.adicionais.map(a => a.nome).join(', ')}` : '';
+      const adicionaisTotal = (item.adicionais || []).reduce((s, a) => s + a.preco, 0);
       return `
         <div class="cart-item">
           <div class="cart-item-header">
             <span class="cart-item-nome">${item.qty}x Pizza ${item.tamanhoNome}</span>
             <span class="cart-item-subtotal">${fmt(item.total)}</span>
           </div>
-          <div class="cart-item-detail">${sabsStr}<br>${bordaStr}</div>
+          <div class="cart-item-detail">${sabsStr}<br>${bordaStr}${adicStr}</div>
           <div class="cart-item-actions">
             <button class="cart-del" onclick="removerDoCarrinho(${item.id})">🗑 Remover</button>
-            <span style="font-size:0.78rem;color:var(--text2)">${fmt(item.precoUnit + item.bordaPreco)} × ${item.qty}</span>
+            <span style="font-size:0.78rem;color:var(--text2)">${fmt(item.precoUnit + item.bordaPreco + adicionaisTotal)} × ${item.qty}</span>
           </div>
         </div>`;
     } else {
+      const adStr = (item.adicionais || []).length
+        ? `<div class="cart-item-detail">+ ${item.adicionais.map(a => a.nome).join(', ')}</div>` : '';
       return `
         <div class="cart-item">
           <div class="cart-item-header">
             <span class="cart-item-nome">${item.qty}x ${item.nome}</span>
             <span class="cart-item-subtotal">${fmt(item.total)}</span>
           </div>
+          ${adStr}
           <div class="cart-item-actions">
             <button class="cart-del" onclick="removerDoCarrinho('${item.id}')">🗑 Remover</button>
             <span style="font-size:0.78rem;color:var(--text2)">${fmt(item.precoUnit)} × ${item.qty}</span>
@@ -797,7 +968,7 @@ function toggleCamposEntrega() {
   const campos = document.getElementById('campos-delivery');
   if (!campos) return;
   campos.style.display = isDelivery ? 'flex' : 'none';
-  if (isDelivery && zonasEntregaGlobal.length) {
+  if (isDelivery) {
     const sel = document.getElementById('checkout-bairro');
     if (sel && sel.options.length <= 1) {
       zonasEntregaGlobal.forEach(z => {
@@ -815,6 +986,11 @@ function toggleCamposEntrega() {
         opt.value = 'outro';
         opt.textContent = '📍 Outro bairro (calcular por distância)...';
         sel.appendChild(opt);
+      }
+      // Se não tem bairros fixos, auto-seleciona distância para não deixar tela em branco
+      if (!zonasEntregaGlobal.length && sel.options.length > 1) {
+        sel.value = 'outro';
+        selecionarBairroCheckout();
       }
     }
   }
@@ -867,14 +1043,28 @@ async function calcularFrete() {
 
   try {
     const cidade = negGlobal.cidade ? `${negGlobal.cidade} Brasil` : 'Rondonópolis MT Brasil';
-    const query = `${endereco}, ${cidade}`;
-    const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`,
-      { headers: { 'User-Agent': 'ZapComanda/1.0' } }
-    );
-    const data = await resp.json();
+
+    // Tenta progressivamente: endereço completo → só rua → só bairro
+    const tentativas = [
+      `${endereco}, ${cidade}`,
+      // remove número (ex: "Rua X, 123, Bairro" → "Rua X, Bairro")
+      endereco.replace(/,?\s*\d{1,5}\b/, '') + `, ${cidade}`,
+      // só a última parte (bairro) + cidade
+      endereco.split(',').slice(-1)[0].trim() + `, ${cidade}`
+    ].filter((v, i, a) => a.indexOf(v) === i); // remove duplicatas
+
+    let data = [];
+    for (const q of tentativas) {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=br`,
+        { headers: { 'User-Agent': 'ZapComanda/1.0' } }
+      );
+      data = await resp.json();
+      if (data.length) break;
+    }
+
     if (!data.length) {
-      mostrarToast('Endereço não encontrado. Tente detalhar mais (ex: rua + bairro)');
+      mostrarToast('Endereço não encontrado. Tente digitar só o bairro ou região.');
       return;
     }
 
@@ -900,6 +1090,7 @@ async function calcularFrete() {
 // ── CHECKOUT ──────────────────────────────────
 function mostrarCheckout() {
   if (carrinho.length === 0) { mostrarToast('Adicione itens ao carrinho'); return; }
+  if (negGlobal && !estaAberto(negGlobal)) { mostrarToast('A pizzaria está fechada no momento. Pedidos não estão disponíveis agora.'); return; }
   fecharCarrinho();
   document.getElementById('checkout-modal').classList.add('aberto');
   document.body.style.overflow = 'hidden';
@@ -918,8 +1109,11 @@ function fecharCheckoutFora(e) {
 async function confirmarPedido() {
   const nome = document.getElementById('checkout-nome').value.trim();
   const telRaw = document.getElementById('checkout-tel').value.trim().replace(/\D/g, '');
-  const entrega = document.querySelector('input[name="entrega"]:checked')?.value || 'retirada';
+  const entregaOpt = document.querySelector('input[name="entrega"]:checked')?.value || 'retirada';
+  const entrega = entregaOpt === 'delivery' ? 'entrega' : 'retirada';
   const obs = document.getElementById('checkout-obs').value.trim();
+
+  const formaPagamento = document.querySelector('input[name="pagamento"]:checked')?.value || '';
 
   const bairroSel = document.getElementById('checkout-bairro');
   const isOutroBairro = bairroSel?.value === 'outro';
@@ -932,9 +1126,10 @@ async function confirmarPedido() {
 
   if (!nome) { mostrarToast('Digite seu nome'); return; }
   if (telRaw.length < 10) { mostrarToast('Digite um WhatsApp válido com DDD'); return; }
-  if (entrega === 'delivery' && !bairroSel?.value) { mostrarToast('Selecione o bairro de entrega'); return; }
-  if (entrega === 'delivery' && isOutroBairro && !taxaEntregaSelecionada) { mostrarToast('Calcule o frete antes de confirmar'); return; }
-  if (entrega === 'delivery' && !enderecoRua) { mostrarToast('Digite o endereço de entrega'); return; }
+  if (!formaPagamento) { mostrarToast('Selecione a forma de pagamento'); return; }
+  if (entrega === 'entrega' && !bairroSel?.value) { mostrarToast('Selecione o bairro de entrega'); return; }
+  if (entrega === 'entrega' && isOutroBairro && !taxaEntregaSelecionada) { mostrarToast('Calcule o frete antes de confirmar'); return; }
+  if (entrega === 'entrega' && !enderecoRua) { mostrarToast('Digite o endereço de entrega'); return; }
 
   const btn = document.getElementById('btn-confirmar');
   btn.disabled = true;
@@ -946,7 +1141,8 @@ async function confirmarPedido() {
         return { tipo: 'pizza', tamanho: item.tamanhoNome, sabores: item.saboresNomes,
                  borda: item.bordaNome || null, qty: item.qty, precoUnit: item.precoUnit, total: item.total };
       }
-      return { tipo: 'produto', nome: item.nome, qty: item.qty, precoUnit: item.precoUnit, total: item.total };
+      return { tipo: 'produto', nome: item.nome, qty: item.qty, precoUnit: item.precoUnit, total: item.total,
+               adicionais: (item.adicionais || []).map(a => ({ nome: a.nome, preco: a.preco })) };
     });
 
     const totalComTaxa = totalCarrinho() + taxaEntregaSelecionada;
@@ -957,29 +1153,57 @@ async function confirmarPedido() {
         'Content-Type': 'application/json', Prefer: 'return=representation'
       },
       body: JSON.stringify({
-        negocio_id: negGlobal.id, cliente_nome: nome, cliente_telefone: telRaw,
-        itens, total: totalComTaxa, tipo_entrega: entrega,
-        bairro: bairroNome || null, endereco: enderecoRua || null,
-        taxa_entrega: taxaEntregaSelecionada || null,
-        observacao: obs || null, status: 'aguardando'
+        negocio_id: negGlobal.id,
+        nome_cliente: nome,
+        numero_whatsapp: telRaw,
+        itens: itens.map(it => obs ? { ...it, observacao_geral: obs } : it),
+        subtotal: totalCarrinho(),
+        taxa_entrega: taxaEntregaSelecionada || 0,
+        total: totalComTaxa,
+        tipo_entrega: entrega,
+        forma_pagamento: formaPagamento,
+        endereco_entrega: entrega === 'entrega'
+          ? { bairro: bairroNome || null, rua: enderecoRua || null }
+          : null,
+        status: 'confirmado'
       })
     });
 
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.message || `Erro ${resp.status}`);
+    }
+
     const pedidoArr = await resp.json();
     const pedidoId = pedidoArr[0]?.id || '';
+
+    // Cadastro automático do cliente (só insere se não existir)
+    try {
+      const existing = await fetch(`${SUPABASE_URL}/rest/v1/clientes_finais?negocio_id=eq.${negGlobal.id}&numero_whatsapp=eq.${telRaw}&select=id`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      }).then(r => r.json());
+      if (!existing.length) {
+        await fetch(`${SUPABASE_URL}/rest/v1/clientes_finais`, {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ negocio_id: negGlobal.id, numero_whatsapp: telRaw, nome, receber_promocoes: true })
+        });
+      }
+    } catch(e) {}
 
     // Mensagem para o restaurante
     const numero = (negGlobal.whatsapp_numero || '').replace(/\D/g, '');
     let linhas = [`🔔 *Pedido #${pedidoId}*\n`];
     linhas.push(`👤 *${nome}*`);
     linhas.push(`📱 ${telRaw}`);
-    if (entrega === 'delivery') {
+    if (entrega === 'entrega') {
       linhas.push(`🛵 Delivery — ${bairroNome}`);
       linhas.push(`📍 ${enderecoRua}`);
       if (taxaEntregaSelecionada > 0) linhas.push(`Taxa de entrega: ${fmt(taxaEntregaSelecionada)}`);
     } else {
       linhas.push(`🏪 Retirar na loja`);
     }
+    linhas.push(`💳 Pagamento: ${formaPagamento}`);
     if (obs) linhas.push(`💬 ${obs}`);
     linhas.push('\n------ ITENS ------');
     carrinho.forEach(item => {
@@ -987,9 +1211,13 @@ async function confirmarPedido() {
         linhas.push(`\n🍕 *${item.qty}x Pizza ${item.tamanhoNome}*`);
         linhas.push(`Sabores: ${item.saboresNomes.join(', ')}`);
         linhas.push(item.bordaNome ? `Borda: ${item.bordaNome}` : 'Sem borda');
+        if ((item.adicionais || []).length) linhas.push(`Adicionais: ${item.adicionais.map(a => a.nome).join(', ')}`);
         linhas.push(`Subtotal: ${fmt(item.total)}`);
       } else {
         linhas.push(`🔹 *${item.qty}x ${item.nome}*  ${fmt(item.total)}`);
+        if ((item.adicionais || []).length) {
+          linhas.push(`   + ${item.adicionais.map(a => a.nome).join(', ')}`);
+        }
       }
     });
     if (taxaEntregaSelecionada > 0) {
@@ -998,22 +1226,50 @@ async function confirmarPedido() {
     }
     linhas.push(`\n*Total: ${fmt(totalComTaxa)}*`);
 
-    if (numero) {
-      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(linhas.join('\n'))}`, '_blank');
-    }
+    const wppUrl = numero ? `https://wa.me/${numero}?text=${encodeURIComponent(linhas.join('\n'))}` : '';
+
+    // Mensagem automática de confirmação para o cliente
+    try {
+      const m = negGlobal.modulos || {};
+      const evApikey = m.evolution_apikey;
+      const evInstance = m.evolution_instance || negGlobal.instance_name;
+      if (evApikey && evInstance && telRaw) {
+        await fetch('https://n8n.hallogenic.com.br/webhook/send-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instance: evInstance,
+            apikey: evApikey,
+            number: telRaw + '@s.whatsapp.net',
+            text: `${nome}, recebemos seu pedido! 🎉\nPedido *#${pedidoId.slice(0,8)}*\n\nAssim que ficar pronto você recebe uma mensagem aqui! 📱`
+          })
+        });
+      }
+    } catch(e) {}
+
+    // Contar pizzas históricas (inclui o pedido atual)
+    let totalPizzas = 0;
+    try {
+      const hist = await sb('pedidos', {
+        negocio_id: `eq.${negGlobal.id}`, numero_whatsapp: `eq.${telRaw}`,
+        select: 'itens', limit: 100
+      });
+      totalPizzas = hist.reduce((sum, p) => {
+        return sum + (p.itens || []).filter(i => i.tipo === 'pizza').reduce((a, i) => a + (i.qty || 1), 0);
+      }, 0);
+    } catch(e) {}
 
     // Limpar carrinho
     carrinho = []; prodQtd = {}; saboresSelecionados.clear();
-    bordaSelecionadaId = null; bordaSelecionadaNome = ''; bordaSelecionadaPreco = 0; qtdPizza = 1;
+    bordaSelecionadaId = null; bordaSelecionadaNome = ''; bordaSelecionadaPreco = 0; pizzaAdicionaisSelecionados = []; qtdPizza = 1;
     taxaEntregaSelecionada = 0;
     bairroOutroNome = '';
     document.querySelectorAll('.pizza-card').forEach(c => c.classList.remove('selecionado', 'desabilitado'));
     document.querySelectorAll('.borda-card').forEach(c => c.classList.remove('selecionada'));
     const qv = document.getElementById('qtd-pizza-val'); if (qv) qv.textContent = '1';
 
-    fecharCheckout();
     atualizarFooter();
-    mostrarToast(`✅ Pedido #${pedidoId} enviado! Aguarde confirmação no WhatsApp.`);
+    mostrarSucesso(pedidoId, wppUrl, totalPizzas);
 
   } catch(e) {
     console.error(e);
@@ -1022,6 +1278,89 @@ async function confirmarPedido() {
     btn.disabled = false;
     btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Confirmar Pedido';
   }
+}
+
+// ── HISTÓRICO DO CLIENTE ──────────────────────────────────
+async function buscarHistoricoCliente() {
+  if (!negGlobal) return;
+  const tel = document.getElementById('checkout-tel').value.replace(/\D/g, '');
+  if (tel.length < 10) return;
+  try {
+    const pedidos = await sb('pedidos', {
+      negocio_id: `eq.${negGlobal.id}`, numero_whatsapp: `eq.${tel}`,
+      select: 'nome_cliente,itens,total,status', order: 'criado_em.desc', limit: 50
+    });
+    if (!pedidos.length) return;
+
+    // Pré-preencher nome
+    const nomeInput = document.getElementById('checkout-nome');
+    if (!nomeInput.value && pedidos[0].nome_cliente) nomeInput.value = pedidos[0].nome_cliente;
+
+    // Contar pizzas
+    const totalPizzas = pedidos.reduce((sum, p) => {
+      return sum + (p.itens || []).filter(i => i.tipo === 'pizza').reduce((a, i) => a + (i.qty || 1), 0);
+    }, 0);
+
+    // Montar resumo do último pedido
+    const ultimo = pedidos[0];
+    const itensUltimo = ultimo.itens || [];
+    const resumoItens = itensUltimo.map(item => {
+      if (item.tipo === 'pizza') {
+        const sabores = (item.sabores || []).join(' / ');
+        const tam = item.tamanho ? item.tamanho + ' — ' : '';
+        const borda = item.borda && item.borda !== 'Sem borda' ? ` + ${item.borda}` : '';
+        return `🍕 ${tam}${sabores}${borda}`;
+      }
+      return `• ${item.qty || 1}x ${item.nome}`;
+    }).join('<br>');
+
+    const fmt = v => 'R$' + parseFloat(v||0).toFixed(2).replace('.',',');
+
+    const hint = document.getElementById('checkout-historico');
+    hint.style.display = 'block';
+    hint.style.background = '#fff8f0';
+    hint.style.border = '1px solid #ffe0b2';
+    hint.style.borderRadius = '12px';
+    hint.style.padding = '12px 14px';
+
+    const pizzaMsg = totalPizzas > 0
+      ? `🍣 Olá de volta! Você já fez <strong>${totalPizzas} pedido${totalPizzas > 1 ? 's' : ''}</strong> com a gente!`
+      : `😊 Olá de volta, <strong>${ultimo.nome_cliente || ''}</strong>! Que bom te ver por aqui!`;
+
+    hint.innerHTML = `
+      <div style="font-size:0.9rem;margin-bottom:10px">${pizzaMsg}</div>
+      <div style="background:#fff;border-radius:8px;padding:10px 12px;font-size:0.82rem;color:#444;line-height:1.7">
+        <div style="font-weight:700;margin-bottom:4px;color:#c0392b">Último pedido — ${fmt(ultimo.total)}</div>
+        ${resumoItens}
+      </div>
+`;
+
+  } catch(e) {}
+}
+
+// ── TELA DE SUCESSO ──────────────────────────────────
+function mostrarSucesso(pedidoId, wppUrl, totalPizzas) {
+  document.getElementById('checkout-form').style.display = 'none';
+  document.querySelector('#checkout-modal .cart-sheet-header').style.display = 'none';
+  const sucesso = document.getElementById('checkout-sucesso');
+  sucesso.style.display = 'block';
+  document.getElementById('sucesso-num').textContent = `#${pedidoId}`;
+  const elPizzas = document.getElementById('sucesso-pizzas');
+  if (totalPizzas > 0) {
+    elPizzas.style.display = 'block';
+    elPizzas.textContent = `🍣 Você já fez ${totalPizzas} pedido${totalPizzas > 1 ? 's' : ''} com a gente!`;
+  }
+  const btnWpp = document.getElementById('sucesso-btn-wpp');
+  if (wppUrl) { btnWpp.onclick = () => window.open(wppUrl, '_blank'); }
+  else { btnWpp.style.display = 'none'; }
+}
+
+function fecharSucesso() {
+  document.getElementById('checkout-sucesso').style.display = 'none';
+  document.getElementById('checkout-form').style.display = 'flex';
+  document.querySelector('#checkout-modal .cart-sheet-header').style.display = '';
+  document.getElementById('checkout-historico').style.display = 'none';
+  fecharCheckout();
 }
 
 // ── TOAST ──────────────────────────────────
@@ -1035,6 +1374,7 @@ function mostrarToast(msg) {
 function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos = []) {
   const aberto = estaAberto(neg);
   const modulos = neg.modulos || {};
+  const bordasPagas = bordas.filter(b => b.disponivel && parseFloat(b.preco_adicional || 0) > 0);
 
   // Aplicar preset de cores por tipo
   const preset = PRESETS[neg.tipo] || PRESETS.generico;
@@ -1046,6 +1386,12 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
   const saboresPorCat = {}, produtosPorCat = {};
   sabores.forEach(s => { const k = s.categoria_id || 'sem'; if (!saboresPorCat[k]) saboresPorCat[k] = []; saboresPorCat[k].push(s); });
   produtos.forEach(p => { const k = p.categoria_id || 'sem'; if (!produtosPorCat[k]) produtosPorCat[k] = []; produtosPorCat[k].push(p); });
+
+  // Mapas para checar categoria na hora de exibir adicionais
+  catNomeMap = {};
+  categorias.forEach(c => { catNomeMap[c.id] = (c.nome || '').toLowerCase(); });
+  produtoCatIdMap = {};
+  produtos.forEach(p => { if (p.id) produtoCatIdMap[p.id] = p.categoria_id; });
 
   let html = `
     <div class="header" style="background:${preset.gradient}">
@@ -1067,7 +1413,7 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
   if (combos.length) {
     html += `<button class="cat-btn" onclick="scrollParaCat('combos')">🎁 Combos</button>`;
   }
-  if (bordas.length && modulos.bordas) {
+  if (bordasPagas.length && modulos.bordas) {
     html += `<button class="cat-btn" onclick="scrollParaCat('bordas')">🫕 Bordas</button>`;
   }
   html += `</div>`;
@@ -1104,7 +1450,12 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
   if (!aberto) {
     const dias = ['dom','seg','ter','qua','qui','sex','sab'];
     const hoj = (neg.horarios || {})[dias[new Date().getDay()]];
-    html += `<div class="fechado-banner">⏰ Estamos fechados agora.${hoj?.ativo ? `<br>Hoje abrimos às <strong>${hoj.abre}</strong>.` : '<br>Não funcionamos hoje.'}</div>`;
+    let horarioStr = '';
+    if (hoj?.ativo) {
+      horarioStr = `<br>Hoje: <strong>${hoj.abre}–${hoj.fecha}</strong>`;
+      if (hoj.periodo2 && hoj.abre2) horarioStr += ` e <strong>${hoj.abre2}–${hoj.fecha2}</strong>`;
+    } else { horarioStr = '<br>Não funcionamos hoje.'; }
+    html += `<div class="fechado-banner">⏰ Estamos fechados agora.${horarioStr}</div>`;
   }
 
   // Categorias com sabores
@@ -1116,18 +1467,21 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
     html += `<div class="secao" id="cat-${cat.id}">`;
     html += `<div class="secao-titulo">${cat.icone ? cat.icone + ' ' : ''}${cat.nome}</div>`;
 
-    sabs.forEach(s => {
+    const sabsOrdenados = [...sabs].sort((a,b) => (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0));
+    sabsOrdenados.forEach(s => {
       const precosTam = precosMap[s.id] || {};
       const precosJson = encodeURIComponent(JSON.stringify(precosTam));
       const precoInicial = tamanhoAtivo && precosTam[tamanhoAtivo] ? fmt(precosTam[tamanhoAtivo]) : '';
       const fotoSabor = s.foto_url
         ? `<img class="pizza-foto" src="${s.foto_url}" alt="${s.nome}" loading="lazy">`
         : `<img class="pizza-foto" src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=128&h=128&fit=crop&crop=center&q=80" alt="Pizza" loading="lazy">`;
+      const destBadge = s.destaque ? `<span style="position:absolute;top:4px;left:4px;background:#f1c40f;color:#1a1a1a;font-size:0.6rem;font-weight:800;padding:2px 6px;border-radius:8px;letter-spacing:.3px">⭐ DESTAQUE</span>` : '';
 
       html += `
-        <div class="pizza-card ${s.disponivel ? '' : 'indisponivel'}"
+        <div class="pizza-card ${s.disponivel ? '' : 'indisponivel'}" style="position:relative"
              id="pizza-card-${s.id}" data-sabor-id="${s.id}"
              ${s.disponivel ? `onclick="toggleSabor('${s.id}')"` : ''}>
+          ${destBadge}
           ${fotoSabor}
           <div class="pizza-info">
             <div class="pizza-nome">${s.nome}</div>
@@ -1140,16 +1494,18 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
         </div>`;
     });
 
-    prods.forEach(p => {
+    const prodsOrdenados = [...prods].sort((a,b) => (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0));
+    prodsOrdenados.forEach(p => {
       const precoFmt = p.preco ? fmt(p.preco) : '';
       const fotoHtml = p.foto_url
         ? `<img class="item-foto" src="${p.foto_url}" alt="${p.nome}" loading="lazy">`
         : `<div class="item-foto-placeholder">🥤</div>`;
+      const destBadge = p.destaque ? `<span style="background:#f1c40f;color:#1a1a1a;font-size:0.6rem;font-weight:800;padding:2px 6px;border-radius:8px;letter-spacing:.3px;margin-bottom:2px;display:inline-block">⭐ DESTAQUE</span><br>` : '';
       html += `
         <div class="item-card ${p.disponivel ? '' : 'indisponivel'}">
           ${fotoHtml}
           <div class="item-info">
-            <div class="item-nome">${p.codigo ? p.codigo + '. ' : ''}${p.nome}</div>
+            <div class="item-nome">${destBadge}${p.codigo ? p.codigo + '. ' : ''}${p.nome}</div>
             ${p.descricao ? `<div class="item-desc">${p.descricao}</div>` : ''}
           </div>
           <div class="item-right">
@@ -1189,14 +1545,14 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
     html += `</div>`;
   }
 
-  // Bordas selecionáveis
-  if (bordas.length && modulos.bordas) {
+  // Bordas selecionáveis (apenas bordas com preço > 0)
+  if (bordasPagas.length && modulos.bordas) {
     const tamOrdem = {};
     tamanhos.forEach(t => { tamOrdem[t.id] = t.ordem; });
     const ordemAtual = tamanhoAtivo ? (tamOrdem[tamanhoAtivo] || 1) : 1;
 
     html += `<div class="secao" id="cat-bordas"><div class="secao-titulo">🫕 Bordas Recheadas</div>`;
-    bordas.filter(b => b.disponivel).forEach(b => {
+    bordasPagas.forEach(b => {
       const base = parseFloat(b.preco_adicional || 0);
       const precoAtual = base > 0 ? base + (ordemAtual - 1) * 4 : 0;
       const dadosBorda = encodeURIComponent(JSON.stringify({ base, incremento: base > 0 ? 4 : 0 }));
@@ -1211,6 +1567,24 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
             ${precoAtual > 0 ? '+' + fmt(precoAtual) : 'Grátis'}
           </span>
         </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Adicionais de pizza
+  const adicionaisPizza = adicionaisGlobal.filter(a => a.disponivel);
+  if (adicionaisPizza.length) {
+    html += `<div class="secao" id="cat-adicionais-pizza"><div class="secao-titulo">➕ Adicionais</div>`;
+    adicionaisPizza.forEach(a => {
+      html += `
+        <label style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:12px 14px;margin-bottom:8px;cursor:pointer;gap:10px;user-select:none;-webkit-tap-highlight-color:transparent" id="pizza-adic-lbl-${a.id}">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div id="pizza-adic-chk-${a.id}" style="width:18px;height:18px;border-radius:4px;border:2px solid var(--border);background:#f8f8f8;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s"></div>
+            <span style="font-weight:600;font-size:0.9rem">${a.nome}</span>
+          </div>
+          <span style="font-weight:800;color:var(--accent);font-size:0.92rem">${a.preco > 0 ? '+' + fmt(a.preco) : 'Grátis'}</span>
+          <input type="checkbox" class="pizza-adic-input" data-id="${a.id}" data-nome="${a.nome}" data-preco="${a.preco || 0}" style="display:none" onchange="togglePizzaAdicional('${a.id}','${a.nome.replace(/'/g,"\\'")}',${a.preco||0})">
+        </label>`;
     });
     html += `</div>`;
   }
@@ -1239,7 +1613,7 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
 
   // Footer
   const numero = (neg.whatsapp_numero || '').replace(/\D/g, '');
-  const msgGenerico = encodeURIComponent('Olá! Vi o cardápio e quero fazer um pedido 🍕');
+  const msgGenerico = encodeURIComponent('Olá! Vi o cardápio e quero fazer um pedido 🍣');
 
   html += `
     <div class="footer-bar">
