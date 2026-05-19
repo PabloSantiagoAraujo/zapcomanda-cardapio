@@ -332,6 +332,34 @@
     .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40vh; color: var(--text2); gap: 12px; }
     .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* BUSCA */
+    .busca-wrap { padding: 8px 14px 6px; background: var(--surface); }
+    .busca-inner { position: relative; }
+    .busca-input {
+      width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 9px 12px 9px 36px; font-size: 0.88rem; outline: none;
+      background: var(--bg); font-family: inherit; transition: border-color 0.15s; color: var(--text);
+    }
+    .busca-input:focus { border-color: var(--accent); background: var(--surface); }
+    .busca-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2); pointer-events: none; font-size: 0.95rem; }
+    .busca-limpar { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.9rem; padding: 2px; display: none; }
+    .busca-sem-resultado { text-align: center; padding: 40px 20px; color: var(--text2); font-size: 0.9rem; }
+
+    /* PREÇO PROMO */
+    .item-preco-promo { font-weight: 800; color: var(--accent); font-size: 0.95rem; white-space: nowrap; }
+    .item-preco-riscado { font-size: 0.72rem; color: var(--text2); text-decoration: line-through; display: block; text-align: right; }
+    .promo-badge { background: #e74c3c; color: #fff; font-size: 0.6rem; font-weight: 800; padding: 2px 5px; border-radius: 6px; letter-spacing: .3px; margin-left: 4px; vertical-align: middle; }
+
+    /* CUPOM */
+    .cupom-row { display: flex; gap: 8px; }
+    .cupom-input { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; outline: none; font-family: inherit; text-transform: uppercase; letter-spacing: 1px; }
+    .cupom-input:focus { border-color: var(--accent); }
+    .btn-cupom { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 0.88rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .btn-cupom:active { background: var(--accent2); }
+    .cupom-status { margin-top: 6px; font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; display: none; }
+    .cupom-ok { background: #f0faf4; color: #27ae60; border: 1px solid #c3e6cb; }
+    .cupom-erro { background: #fff3f3; color: #e74c3c; border: 1px solid #fcc; }
   </style>
 </head>
 <body>
@@ -437,6 +465,14 @@
         <label>Forma de pagamento *</label>
         <div id="pagamento-opts" style="display:flex;flex-direction:column;gap:8px;margin-top:6px"></div>
       </div>
+      <div class="checkout-field" id="campo-cupom">
+        <label>Cupom de desconto (opcional)</label>
+        <div class="cupom-row">
+          <input id="checkout-cupom" class="cupom-input" type="text" placeholder="Ex: PROMO10" maxlength="20">
+          <button class="btn-cupom" onclick="aplicarCupom()">Aplicar</button>
+        </div>
+        <div id="cupom-status" class="cupom-status"></div>
+      </div>
       <div class="checkout-field">
         <label>Observação (opcional)</label>
         <textarea id="checkout-obs" class="checkout-input" placeholder="Ex: sem cebola, troco para R$50..." rows="2" style="resize:none"></textarea>
@@ -519,6 +555,10 @@ let pizzaAdicionaisSelecionados = [];
 let carrinho = [];
 let prodQtd = {}; // produto_id → qty no carrinho
 
+// Cupom
+let cupomAtivo = null; // { codigo, desconto_tipo, desconto_valor, id }
+let cuponsDisponiveis = [];
+
 async function main() {
   try {
     const negocios = await sb('negocios', { instance_name: `eq.${instanceName}`, select: '*' });
@@ -529,7 +569,7 @@ async function main() {
     const neg = negocios[0];
     negGlobal = neg;
 
-    const [categorias, sabores, produtos, tamanhos, bordas, combos, zonas, adicionais] = await Promise.all([
+    const [categorias, sabores, produtos, tamanhos, bordas, combos, zonas, adicionais, cupons] = await Promise.all([
       sb('categorias', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', order: 'ordem.asc', select: '*' }),
       sb('sabores', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
       sb('produtos', { negocio_id: `eq.${neg.id}`, select: '*', order: 'codigo.asc,nome.asc' }),
@@ -537,8 +577,10 @@ async function main() {
       sb('bordas', { negocio_id: `eq.${neg.id}`, select: '*', order: 'nome.asc' }),
       sb('combos', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', select: '*', order: 'nome.asc' }),
       sb('zonas_entrega', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' }),
-      sb('adicionais', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' })
+      sb('adicionais', { negocio_id: `eq.${neg.id}`, disponivel: 'eq.true', select: '*', order: 'nome.asc' }),
+      sb('cupons', { negocio_id: `eq.${neg.id}`, ativo: 'eq.true', select: '*' }).catch(() => [])
     ]);
+    cuponsDisponiveis = cupons || [];
 
     tamanhosGlobal = tamanhos;
     bordasGlobal = bordas;
@@ -1145,7 +1187,9 @@ async function confirmarPedido() {
                adicionais: (item.adicionais || []).map(a => ({ nome: a.nome, preco: a.preco })) };
     });
 
-    const totalComTaxa = totalCarrinho() + taxaEntregaSelecionada;
+    const subtotal = totalCarrinho();
+    const desconto = calcularDesconto();
+    const totalComTaxa = subtotal + taxaEntregaSelecionada - desconto;
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
       method: 'POST',
       headers: {
@@ -1157,9 +1201,11 @@ async function confirmarPedido() {
         nome_cliente: nome,
         numero_whatsapp: telRaw,
         itens: itens.map(it => obs ? { ...it, observacao_geral: obs } : it),
-        subtotal: totalCarrinho(),
+        subtotal,
         taxa_entrega: taxaEntregaSelecionada || 0,
-        total: totalComTaxa,
+        desconto: desconto || 0,
+        cupom_usado: cupomAtivo?.codigo || null,
+        total: Math.max(0, totalComTaxa),
         tipo_entrega: entrega,
         forma_pagamento: formaPagamento,
         endereco_entrega: entrega === 'entrega'
@@ -1176,6 +1222,18 @@ async function confirmarPedido() {
 
     const pedidoArr = await resp.json();
     const pedidoId = pedidoArr[0]?.id || '';
+
+    // Incrementar uso do cupom
+    if (cupomAtivo) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/cupons?id=eq.${cupomAtivo.id}`, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ usos_atuais: (cupomAtivo.usos_atuais || 0) + 1 })
+        });
+      } catch(e) {}
+      cupomAtivo = null;
+    }
 
     // Cadastro automático do cliente (só insere se não existir)
     try {
@@ -1220,11 +1278,12 @@ async function confirmarPedido() {
         }
       }
     });
-    if (taxaEntregaSelecionada > 0) {
-      linhas.push(`\nSubtotal: ${fmt(totalCarrinho())}`);
-      linhas.push(`Taxa entrega: ${fmt(taxaEntregaSelecionada)}`);
+    if (taxaEntregaSelecionada > 0 || desconto > 0) {
+      linhas.push(`\nSubtotal: ${fmt(subtotal)}`);
+      if (taxaEntregaSelecionada > 0) linhas.push(`Taxa entrega: ${fmt(taxaEntregaSelecionada)}`);
+      if (desconto > 0) linhas.push(`🎟 Desconto (${cupomAtivo?.codigo || 'cupom'}): -${fmt(desconto)}`);
     }
-    linhas.push(`\n*Total: ${fmt(totalComTaxa)}*`);
+    linhas.push(`\n*Total: ${fmt(Math.max(0, totalComTaxa))}*`);
 
     const wppUrl = numero ? `https://wa.me/${numero}?text=${encodeURIComponent(linhas.join('\n'))}` : '';
 
@@ -1262,8 +1321,12 @@ async function confirmarPedido() {
     // Limpar carrinho
     carrinho = []; prodQtd = {}; saboresSelecionados.clear();
     bordaSelecionadaId = null; bordaSelecionadaNome = ''; bordaSelecionadaPreco = 0; pizzaAdicionaisSelecionados = []; qtdPizza = 1;
-    taxaEntregaSelecionada = 0;
-    bairroOutroNome = '';
+    taxaEntregaSelecionada = 0; bairroOutroNome = '';
+    cupomAtivo = null;
+    const cupomInp = document.getElementById('checkout-cupom');
+    const cupomSt = document.getElementById('cupom-status');
+    if (cupomInp) cupomInp.value = '';
+    if (cupomSt) { cupomSt.style.display = 'none'; cupomSt.textContent = ''; }
     document.querySelectorAll('.pizza-card').forEach(c => c.classList.remove('selecionado', 'desabilitado'));
     document.querySelectorAll('.borda-card').forEach(c => c.classList.remove('selecionada'));
     const qv = document.getElementById('qtd-pizza-val'); if (qv) qv.textContent = '1';
@@ -1370,6 +1433,91 @@ function mostrarToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+// ── BUSCA ──────────────────────────────────
+function filtrarBusca(q) {
+  const query = (q || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const normalizar = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  let algumVisivel = false;
+  document.querySelectorAll('.secao').forEach(sec => {
+    const cards = [...sec.querySelectorAll('.item-card, .pizza-card')];
+    let secVisivel = false;
+    cards.forEach(card => {
+      const texto = normalizar(card.textContent);
+      const visivel = !query || texto.includes(query);
+      card.style.display = visivel ? '' : 'none';
+      if (visivel) secVisivel = true;
+    });
+    sec.style.display = secVisivel || !query ? '' : 'none';
+    if (secVisivel) algumVisivel = true;
+  });
+  const semRes = document.getElementById('busca-sem-resultado');
+  if (semRes) semRes.style.display = query && !algumVisivel ? 'block' : 'none';
+  const btnLimpar = document.getElementById('busca-limpar');
+  if (btnLimpar) btnLimpar.style.display = query ? 'block' : 'none';
+}
+
+function limparBusca() {
+  const inp = document.getElementById('busca-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  filtrarBusca('');
+}
+
+// ── CUPOM ──────────────────────────────────
+async function aplicarCupom() {
+  const codigo = (document.getElementById('checkout-cupom')?.value || '').trim().toUpperCase();
+  const statusEl = document.getElementById('cupom-status');
+  if (!codigo) { mostrarToast('Digite o código do cupom'); return; }
+
+  const mostrarStatus = (msg, ok) => {
+    if (!statusEl) return;
+    statusEl.className = 'cupom-status ' + (ok ? 'cupom-ok' : 'cupom-erro');
+    statusEl.textContent = msg;
+    statusEl.style.display = 'block';
+  };
+
+  // Verificar se já tem cupom aplicado
+  if (cupomAtivo) { cupomAtivo = null; }
+
+  // Buscar cupom ativo com esse código
+  const cupom = cuponsDisponiveis.find(c => c.codigo === codigo && c.ativo);
+  if (!cupom) {
+    mostrarStatus('❌ Cupom inválido ou expirado.', false);
+    return;
+  }
+
+  // Verificar validade
+  if (cupom.valido_ate && new Date(cupom.valido_ate) < new Date()) {
+    mostrarStatus('❌ Cupom expirado.', false);
+    return;
+  }
+
+  // Verificar limite de uso
+  if (cupom.uso_maximo && cupom.usos_atuais >= cupom.uso_maximo) {
+    mostrarStatus('❌ Cupom esgotado.', false);
+    return;
+  }
+
+  cupomAtivo = cupom;
+  const subtotal = totalCarrinho();
+  let desconto = 0;
+  if (cupom.desconto_tipo === 'pct') {
+    desconto = subtotal * (cupom.desconto_valor / 100);
+  } else {
+    desconto = Math.min(cupom.desconto_valor, subtotal);
+  }
+  const textoDesc = cupom.desconto_tipo === 'pct'
+    ? `${cupom.desconto_valor}% de desconto`
+    : `R$ ${parseFloat(cupom.desconto_valor).toFixed(2).replace('.', ',')} de desconto`;
+  mostrarStatus(`✅ Cupom aplicado! ${textoDesc} → Desconto: ${fmt(desconto)}`, true);
+}
+
+function calcularDesconto() {
+  if (!cupomAtivo) return 0;
+  const subtotal = totalCarrinho();
+  if (cupomAtivo.desconto_tipo === 'pct') return subtotal * (cupomAtivo.desconto_valor / 100);
+  return Math.min(cupomAtivo.desconto_valor, subtotal);
+}
+
 // ── RENDER PRINCIPAL ──────────────────────────────────
 function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos = []) {
   const aberto = estaAberto(neg);
@@ -1417,6 +1565,16 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
     html += `<button class="cat-btn" onclick="scrollParaCat('bordas')">🫕 Bordas</button>`;
   }
   html += `</div>`;
+
+  // Barra de busca
+  html += `
+    <div class="busca-wrap">
+      <div class="busca-inner">
+        <span class="busca-ico">🔍</span>
+        <input id="busca-input" class="busca-input" type="search" placeholder="Buscar no cardápio..." oninput="filtrarBusca(this.value)" autocomplete="off">
+        <button id="busca-limpar" class="busca-limpar" onclick="limparBusca()">✕</button>
+      </div>
+    </div>`;
 
   if (temTamanhos) {
     const tamInicial = tamanhos[0];
@@ -1494,13 +1652,23 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
         </div>`;
     });
 
-    const prodsOrdenados = [...prods].sort((a,b) => (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0));
+    const prodsOrdenados = [...prods].sort((a,b) => {
+      if (b.destaque !== a.destaque) return (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0);
+      if (b.preco_promo !== a.preco_promo) return (b.preco_promo ? 1 : 0) - (a.preco_promo ? 1 : 0);
+      return 0;
+    });
     prodsOrdenados.forEach(p => {
       const precoFmt = p.preco ? fmt(p.preco) : '';
+      const temPromo = p.preco_promo && parseFloat(p.preco_promo) > 0;
+      const precoEfetivo = temPromo ? p.preco_promo : p.preco;
       const fotoHtml = p.foto_url
         ? `<img class="item-foto" src="${p.foto_url}" alt="${p.nome}" loading="lazy">`
         : `<div class="item-foto-placeholder">🥤</div>`;
       const destBadge = p.destaque ? `<span style="background:#f1c40f;color:#1a1a1a;font-size:0.6rem;font-weight:800;padding:2px 6px;border-radius:8px;letter-spacing:.3px;margin-bottom:2px;display:inline-block">⭐ DESTAQUE</span><br>` : '';
+      const promoBadge = temPromo ? `<span class="promo-badge">PROMO</span>` : '';
+      const precoHtml = temPromo
+        ? `<div><span class="item-preco-promo">${fmt(p.preco_promo)}${promoBadge}</span><span class="item-preco-riscado">${precoFmt}</span></div>`
+        : precoFmt ? `<span class="item-preco">${precoFmt}</span>` : '';
       html += `
         <div class="item-card ${p.disponivel ? '' : 'indisponivel'}">
           ${fotoHtml}
@@ -1509,10 +1677,10 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
             ${p.descricao ? `<div class="item-desc">${p.descricao}</div>` : ''}
           </div>
           <div class="item-right">
-            ${precoFmt ? `<span class="item-preco">${precoFmt}</span>` : ''}
-            ${p.disponivel && p.preco ? `
-              <div id="prod-ctrl-${p.id}" data-nome="${p.nome}" data-preco="${p.preco}">
-                <button class="item-add-btn" onclick="addProduto('${p.id}','${p.nome.replace(/'/g,"\\'")}',${p.preco})">+</button>
+            ${precoHtml}
+            ${p.disponivel && precoEfetivo ? `
+              <div id="prod-ctrl-${p.id}" data-nome="${p.nome}" data-preco="${precoEfetivo}">
+                <button class="item-add-btn" onclick="addProduto('${p.id}','${p.nome.replace(/'/g,"\\'")}',${precoEfetivo})">+</button>
               </div>` : ''}
           </div>
         </div>`;
@@ -1641,6 +1809,8 @@ function renderPage(neg, categorias, sabores, produtos, tamanhos, bordas, combos
         <button class="btn-continuar" onclick="continuarComprando()">+ Continuar comprando</button>
       </div>
     </div>`;
+
+  html += `<div id="busca-sem-resultado" class="busca-sem-resultado" style="display:none">🔍 Nenhum item encontrado para a busca.</div>`;
 
   document.getElementById('conteudo').innerHTML = html;
 
