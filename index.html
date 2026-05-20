@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cardápio Online — ZapComanda</title>
+  <title>Cardápio Online — Kommanda</title>
+  <link rel="icon" type="image/png" href="img/icon-preto.png">
   <meta name="theme-color" content="#E63946">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1099,7 +1100,7 @@ async function calcularFrete() {
     for (const q of tentativas) {
       const resp = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=br`,
-        { headers: { 'User-Agent': 'ZapComanda/1.0' } }
+        { headers: { 'User-Agent': 'Kommanda/1.0' } }
       );
       data = await resp.json();
       if (data.length) break;
